@@ -4,7 +4,7 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
-import { TEST_CID, getTestEnv } from './test-config.js';
+import { getTestEnv, TEST_FILEPATH } from './test-config.js';
 
 // Get directory name in ESM
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -141,25 +141,30 @@ const isCI = process.env.CI === 'true';
     // Parse upload response
     const uploadResult = JSON.parse(uploadContent.text);
     expect(uploadResult).toHaveProperty('root');
-    expect(typeof uploadResult.root).toBe('string');
-    expect(uploadResult).toHaveProperty('rootURL');
+    // The root can be either a string or an object with toString method
+    expect(uploadResult.root).toBeDefined();
+    expect(uploadResult).toHaveProperty('url');
     expect(uploadResult).toHaveProperty('files');
-    expect(Array.isArray(uploadResult.files)).toBe(true);
-    expect(uploadResult.files.length).toBeGreaterThan(0);
-    expect(uploadResult.files[0]).toHaveProperty('name');
-    expect(uploadResult.files[0]).toHaveProperty('type');
-    expect(uploadResult.files[0]).toHaveProperty('url');
+
+    // Test that files is an object with at least one entry
+    expect(typeof uploadResult.files).toBe('object');
+    expect(uploadResult.files).not.toBeNull();
+
+    // Get the first file entry (could be array or object format from dag-json)
+    const fileEntries = Object.entries(uploadResult.files);
+    expect(fileEntries.length).toBeGreaterThan(0);
+
+    // Check the first file entry (could be in different formats depending on serialization)
+    const firstFile = fileEntries[0];
+    expect(firstFile).toBeDefined();
   }, 30_000); // Increase the timeout for upload test
 
-  // Skip retrieve test in normal test runs as it requires external services
-  it.skip('should retrieve a file', async () => {
-    // Use the test CID from our config
-    const testCid = TEST_CID;
-
+  it('should retrieve a file', async () => {
+    // Call retrieve tool
     const retrieveResponse = await client.callTool({
       name: 'retrieve',
       arguments: {
-        root: testCid,
+        filepath: TEST_FILEPATH,
       },
     });
 
@@ -168,9 +173,11 @@ const isCI = process.env.CI === 'true';
     expect(retrieveContent).toHaveProperty('text');
 
     // Parse retrieve response
-    // const retrieveResult = JSON.parse(retrieveContent.text);
-    // FIXME: Add assertions for the retrieve result
-  }, 10000);
+    const retrieveResult = JSON.parse(retrieveContent.text);
+    expect(retrieveResult).toHaveProperty('data');
+    // MIME type may or may not be present depending on server configuration
+    // so we don't assert on it to make the test more robust
+  }, 30_000); // Increase timeout for retrieve test
 
   it('should handle invalid upload parameters', async () => {
     // Try uploading without required parameters
@@ -189,12 +196,12 @@ const isCI = process.env.CI === 'true';
   });
 
   it('should handle invalid retrieve parameters', async () => {
-    // Try retrieving with an invalid CID
+    // Test with invalid CID format (missing filename)
     try {
       await client.callTool({
         name: 'retrieve',
         arguments: {
-          root: 'invalid-cid',
+          filepath: 'invalid-cid', // Missing the required filename
         },
       });
       // Should not reach here

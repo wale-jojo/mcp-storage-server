@@ -8,6 +8,7 @@ import {
 } from './types.js';
 import * as Storage from '@storacha/client';
 import { StoreMemory } from '@storacha/client/stores/memory';
+import { DirectoryEntryLink } from '@ipld/unixfs/directory';
 import {
   defaultHeaders,
   accessServiceConnection,
@@ -20,6 +21,8 @@ import { Principal } from '@ucanto/interface';
 import { DID } from '@ucanto/core';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { parseIpfsPath } from './utils.js';
+import { UnknownLink } from 'multiformats';
 
 /**
  * The Storage Service Identifier which will verify the delegation.
@@ -145,74 +148,61 @@ export class StorachaClient implements StorageClient {
       throw new Error('Client not initialized');
     }
 
-    try {
-      if (options.signal?.aborted) {
-        throw new Error('Upload aborted');
-      }
-
-      const fileObjects = files.map(file => {
-        const buffer = Buffer.from(file.content, 'base64');
-        return new File([buffer], file.name, {
-          type: file.type,
-        });
-      });
-
-      // TODO: Use uploadDirectory when we implement the change to collect and return CIDs of each file, and fix the retrieve tool to use paths instead of CIDs.
-      // const root = await this.storage.uploadDirectory(fileObjects, {
-      //   // If publishToFilecoin is false, we don't provide a pieceHasher, so the content is not pinned to the Filecoin Network
-      //   ...(options.publishToFilecoin === false ? { pieceHasher: undefined } : {}),
-      //   retries: options.retries ?? 3,
-      //   signal: options.signal,
-      // });
-
-      // TODO: Use uploadFile when we implement the change to collect and return CIDs of each file, and fix the retrieve tool to use paths instead of CIDs.
-      const root = await this.storage.uploadFile(fileObjects[0], {
-        // Only set pieceHasher as undefined if we don't want to publish to Filecoin
-        ...(options.publishToFilecoin === true ? {} : { pieceHasher: undefined }),
-        retries: options.retries ?? 3,
-        signal: options.signal,
-      });
-
-      return {
-        root: root.toString(),
-        rootURL: new URL(`/ipfs/${root}`, this.getGatewayUrl()).toString(),
-        files: files.map(file => ({
-          name: file.name,
-          type: file.type,
-          url: new URL(`/ipfs/${root}/${file.name}`, this.getGatewayUrl()).toString(),
-        })),
-      };
-    } catch (error: unknown) {
-      console.error(error);
-      throw error;
+    if (options.signal?.aborted) {
+      throw new Error('Upload aborted');
     }
+
+    const fileObjects = files.map(file => {
+      const buffer = Buffer.from(file.content, 'base64');
+      return new File([buffer], file.name);
+    });
+
+    const uploadedFiles: Map<string, UnknownLink> = new Map();
+
+    const root = await this.storage.uploadDirectory(fileObjects, {
+      // Only set pieceHasher as undefined if we don't want to publish to Filecoin
+      ...(options.publishToFilecoin === true ? {} : { pieceHasher: undefined }),
+      retries: options.retries ?? 3,
+      signal: options.signal,
+      onDirectoryEntryLink: (entry: DirectoryEntryLink) => {
+        if (entry.name && entry.name !== '') {
+          uploadedFiles.set(entry.name, entry.cid);
+        }
+      },
+    });
+
+    return {
+      root: root,
+      url: new URL(`/ipfs/${root.toString()}`, this.getGatewayUrl()),
+      files: uploadedFiles,
+    };
   }
 
   /**
    * Retrieve a file from the gateway
-   * @param root - Root CID of the directory containing the file
+   * @param filepath - Path string in the format "cid/filename", "/ipfs/cid/filename", or "ipfs://cid/filename"
    * @returns The file data and metadata
+   * @throws Error if the response is not successful
    */
-  async retrieve(root: string): Promise<RetrieveResult> {
-    try {
-      const response = await fetch(new URL(`/ipfs/${root}`, this.getGatewayUrl()));
-      if (!response.ok) {
-        throw new Error(`HTTP error ${response.status} ${response.statusText}`);
-      }
+  async retrieve(filepath: string): Promise<RetrieveResult> {
+    // Parse the filepath into a Resource object
+    const resource = parseIpfsPath(filepath);
 
-      const buffer = await response.arrayBuffer();
-      const base64Data = Buffer.from(buffer).toString('base64');
-      const contentType = response.headers.get('content-type');
+    // Construct the URL from the Resource object components
+    const pathWithCid = `${resource.cid.toString()}${resource.pathname}`;
+    const response = await fetch(new URL(`/ipfs/${pathWithCid}`, this.getGatewayUrl()));
 
-      return {
-        data: base64Data,
-        type: contentType || undefined,
-      };
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to retrieve file: ${error.message}`, { cause: error });
-      }
-      throw new Error('Failed to retrieve file: Unknown error', { cause: error });
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status} ${response.statusText}`);
     }
+
+    const buffer = await response.arrayBuffer();
+    const base64Data = Buffer.from(buffer).toString('base64');
+    const contentType = response.headers.get('content-type');
+
+    return {
+      data: base64Data,
+      type: contentType || undefined,
+    };
   }
 }

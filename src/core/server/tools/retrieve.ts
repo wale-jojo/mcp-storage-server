@@ -3,24 +3,29 @@ import { StorachaClient } from '../../storage/client.js';
 import { StorageConfig } from 'src/core/storage/types.js';
 
 type RetrieveInput = {
-  root: string;
+  filepath: string;
 };
 
+// Simplified schema that just validates that filepath is a non-empty string
+// The actual parsing/validation happens in the client
 const retrieveInputSchema = z.object({
-  root: z
+  filepath: z
     .string()
-    .describe('The root CID of the directory where the file(s) to retrieve are stored'),
+    .min(1, 'Filepath cannot be empty')
+    .describe(
+      'The path to retrieve in format: CID/filename, /ipfs/CID/filename, or ipfs://CID/filename'
+    ),
 });
 
 export const retrieveTool = (storageConfig: StorageConfig) => ({
   name: 'retrieve',
   description:
-    'Retrieve a file from the Storacha Network using its root CID (CID of the directory where the file(s) to retrieve are stored). The file will be retrieved from the configured gateway URL.',
+    'Retrieve a file from the Storacha Network. Supports formats: CID/filename, /ipfs/CID/filename, or ipfs://CID/filename.',
   inputSchema: retrieveInputSchema,
   handler: async (input: RetrieveInput) => {
     try {
       const client = new StorachaClient(storageConfig);
-      const result = await client.retrieve(input.root);
+      const result = await client.retrieve(input.filepath);
 
       return {
         content: [
@@ -31,16 +36,16 @@ export const retrieveTool = (storageConfig: StorageConfig) => ({
         ],
       };
     } catch (error) {
-      console.error('Error: handling retrieve:', error);
+      console.error('Failed to retrieve resource:', error);
       return {
         content: [
           {
             error: true,
             type: 'text' as const,
             text: JSON.stringify({
-              name: 'Error',
-              message: `Retrieve failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              cause: error instanceof Error ? (error.cause as Error | null) : null,
+              name: error instanceof Error ? error.name : 'Error',
+              message: error instanceof Error ? error.message : 'Unknown error',
+              cause: error instanceof Error && error.cause ? (error.cause as Error).message : null,
             }),
           },
         ],

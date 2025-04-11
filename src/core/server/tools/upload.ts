@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { StorachaClient } from '../../storage/client.js';
-import { detectMimeType, parseDelegation } from '../../storage/utils.js';
-import { StorageConfig } from 'src/core/storage/types.js';
+import { parseDelegation } from '../../storage/utils.js';
+import { StorageConfig, UploadResult } from 'src/core/storage/types.js';
+import * as dagJSON from '@ipld/dag-json';
 
 const uploadInputSchema = z.object({
   file: z
@@ -15,12 +16,6 @@ const uploadInputSchema = z.object({
   name: z
     .string()
     .describe('Name for the uploaded file (must include file extension for MIME type detection)'),
-  type: z
-    .string()
-    .optional()
-    .describe(
-      'MIME type of the file (optional, will be inferred from file extension if not provided)'
-    ),
   delegation: z
     .string()
     .optional()
@@ -62,14 +57,11 @@ export const uploadTool = (storageConfig: StorageConfig) => ({
       });
       await client.initialize();
 
-      const type = input.type || detectMimeType(input.name);
-
-      const result = await client.uploadFiles(
+      const result: UploadResult = await client.uploadFiles(
         [
           {
             name: input.name,
             content: input.file,
-            type,
           },
         ],
         {
@@ -82,11 +74,16 @@ export const uploadTool = (storageConfig: StorageConfig) => ({
         content: [
           {
             type: 'text' as const,
-            text: JSON.stringify(result),
+            text: dagJSON.stringify({
+              root: result.root,
+              url: result.url.toString(), // DAG JSON doesn't support URLs, so we convert to string
+              files: result.files,
+            }),
           },
         ],
       };
     } catch (error) {
+      console.error('Failed to upload resource:', error);
       return {
         content: [
           {
