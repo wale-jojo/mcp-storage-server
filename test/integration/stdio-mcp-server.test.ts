@@ -131,6 +131,14 @@ const isCI = process.env.CI === 'true';
     // Check the first file entry (could be in different formats depending on serialization)
     const firstFile = fileEntries[0];
     expect(firstFile).toBeDefined();
+    // The root can be either a string or an object with toString method
+    expect(uploadResult.root).toBeDefined();
+    expect(uploadResult).toHaveProperty('url');
+    expect(uploadResult).toHaveProperty('files');
+
+    // Test that files is an object with at least one entry
+    expect(typeof uploadResult.files).toBe('object');
+    expect(uploadResult.files).not.toBeNull();
   }, 30_000); // Increase the timeout for upload test
 
   it('should retrieve a file', async () => {
