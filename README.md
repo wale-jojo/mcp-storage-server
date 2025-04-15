@@ -171,6 +171,34 @@ const result = await client.invoke('upload', {
 
 _Read the [step-by-step guide](https://docs.storacha.network/concepts/ucan/#step-by-step-delegation-with-w3cli) to learn how to create a delegation using the CLI._
 
+## MCP Server Config
+
+**Cursor**
+
+```jsonc
+{
+  "mcpServers": {
+    "storacha-storage-server": {
+      "command": "node",
+      "args": [
+        // Absolute path to the mcp-storage-server/dist/index.js
+        "/path/to/mcp-storage-server/dist/index.js",
+      ],
+      "env": {
+        "MCP_TRANSPORT_MODE": "stdio",
+        // Required: The Storacha Agent private key that is authorized to upload files
+        "PRIVATE_KEY": "...",
+        // Optional: The base64 encoded delegation that authorizes the Agent owner of the private key to upload files. If not set, MUST be provided for each upload request.
+        "DELEGATION": "...",
+      },
+      "shell": true,
+      // Absolute path to the root folder of the project
+      "cwd": "/path/to/mcp-storage-server",
+    },
+  },
+}
+```
+
 ## Testing with MCP Inspector
 
 The MCP Inspector provides a visual interface for testing and debugging MCP servers. To test the Storacha MCP server:
