@@ -57,8 +57,7 @@ Get started with the Storacha MCP Storage Server in just a few simple steps.
      ```bash
      w3 space create <your_space_name>
      ```
-     _Replace `<your_space_name>` with a name for your new Space_.
-     :warning: _Make sure you save the recovery key, so you can access your space from another device if needed._
+     _Replace `<your_space_name>` with a name for your new Space_. :warning: _Make sure you save the recovery key, so you can access your space from another device if needed._
    - **Create a Private Key**
 
      ```bash
