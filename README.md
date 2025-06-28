@@ -184,3 +184,6 @@ MIT or Apache 2 License
 ## Support
 
 For support, please visit [Storacha Support](https://storacha.network) or open an issue in this repository.
+
+## Certifications
+- [MCP Review](https://mcpreview.com/mcp-servers/storacha/mcp-storage-server)
