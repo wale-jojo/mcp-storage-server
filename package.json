@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "pnpm typecheck && tsc && cp package.json dist/package.json",
+    "build": "pnpm typecheck && tsup && pnpm copy-package",
     "start": "node dist/index.js",
     "start:stdio": "MCP_TRANSPORT_MODE=stdio pnpm start",
     "start:sse": "MCP_TRANSPORT_MODE=sse pnpm start",
@@ -30,7 +30,8 @@
     "inspect:stdio": "MCP_TRANSPORT_MODE=stdio pnpm inspect",
     "inspect:rest": "MCP_TRANSPORT_MODE=rest pnpm inspect",
     "prepare": "husky install",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm build",
+    "copy-package": "powershell Copy-Item package.json dist/package.json"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -88,6 +89,7 @@
     "prettier": "^3.5.3",
     "ts-node": "^10.9.2",
     "tsc-watch": "^6.2.1",
+    "tsup": "^8.5.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"

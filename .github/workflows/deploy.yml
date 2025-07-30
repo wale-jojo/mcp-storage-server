@@ -1,0 +1,22 @@
+name: Deploy MCP Storage Server
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install
+      - run: pnpm build
+      - run: |
+          echo "PRIVATE_KEY=${{ secrets.PRIVATE_KEY }}" >> .env
+          echo "DELEGATION=${{ secrets.DELEGATION }}" >> .env
+      - run: pnpm start:stdio
