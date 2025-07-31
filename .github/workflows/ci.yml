@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       HUSKY: 0  # Skip Husky hooks in CI
-      PRIVATE_KEY: ${{ secrets.TEST_PRIVATE_KEY }}
-      DELEGATION: ${{ secrets.TEST_DELEGATION }}
+      PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+      DELEGATION: ${{ secrets.DELEGATION }}
 
     steps:
     - uses: actions/checkout@v4
